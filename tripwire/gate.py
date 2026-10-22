@@ -83,7 +83,9 @@ class Gate:
             return "GATE DECISIONS:\n" + "\n".join(lines)
 
         def generator(prompt: str) -> dict[str, str]:
-            text, receipt = chat([{"role": "system", "content": AGENT_SYSTEM}, {"role": "user", "content": prompt}])
+            # The backlog is constant framing (the spec's G term): it does not grow with chain length.
+            system = AGENT_SYSTEM + "\n\nFULL BACKLOG (constant):\n" + task
+            text, receipt = chat([{"role": "system", "content": system}, {"role": "user", "content": prompt}])
             gr.receipts.append(receipt)
             return {"text": text}
 

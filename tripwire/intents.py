@@ -56,7 +56,7 @@ class Intent:
         return asdict(self)
 
 
-INTENT_LINE = re.compile(r"^\s*INTENT\s+(\{.*\})\s*$", re.MULTILINE)
+INTENT_LINE = re.compile(r"INTENT\s*:?\s*`*(\{.*\})`*\s*$", re.MULTILINE)
 
 
 def extract_intents(text: str, default_agent: str) -> tuple[list[Intent], list[str]]:
