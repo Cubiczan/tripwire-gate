@@ -116,6 +116,11 @@ class ProviderTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.srv.shutdown()
 
+    def test_split_reasoning(self):
+        from tripwire.meterless import split_reasoning
+        self.assertEqual(split_reasoning("thinking INTENT {x}</think>INTENT {y}")[0], "INTENT {y}")
+        self.assertEqual(split_reasoning("plain")[0], "plain")
+
     def test_normalise(self):
         self.assertEqual(normalise_base("127.0.0.1:8088/v1/chat/completions"), "http://127.0.0.1:8088/v1")
         self.assertEqual(normalise_base("http://h:1/v1"), "http://h:1/v1")

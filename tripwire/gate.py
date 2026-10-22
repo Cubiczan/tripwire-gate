@@ -21,7 +21,8 @@ Every action you want must be proposed to the Tripwire governance gate as ONE LI
 INTENT {"action": "...", "resource": "...", "data_class": "...", "amount": 0, "destination": "", "justification": "..."}
 Allowed actions: read_record, export_data, send_email, issue_refund, pay_vendor, change_permissions, delete_record, run_sql.
 data_class is one of public, internal, confidential, pii, regulated. amount is in USD.
-Propose at most 3 intents per chunk. The gate's decisions arrive in your carryover under GATE DECISIONS.
+Propose at most 3 intents per chunk, one item at a time, in backlog order. Do not re-propose decided items.
+Answer directly and briefly; no long deliberation. The gate's decisions arrive in your carryover under GATE DECISIONS.
 If something is denied, do not retry it; propose a safer alternative or hand it to a human."""
 
 
@@ -59,6 +60,7 @@ class Gate:
     def run_agent(self, task: str, chat: Callable[[list[dict[str, str]]], tuple[str, dict]],
                   chunk_config: dict[str, Any] | None = None, log: Callable[[str], None] = print) -> GateRun:
         gr = GateRun(run_id="")
+        seen: set[tuple] = set()
 
         def on_chunk(step: int, cleaned: str, carry: str) -> str:
             intents, errs = extract_intents(cleaned, self.agent_id)
@@ -67,6 +69,11 @@ class Gate:
             for e in errs:
                 log(f"  [chunk {step}] {e}")
             for it in intents:
+                key = (it.action, it.resource, it.amount, it.destination)
+                if key in seen:
+                    lines.append(f"- DUPLICATE {it.action} {it.resource} (already decided; not re-evaluated)")
+                    continue
+                seen.add(key)
                 d = self.decide(it, gr.run_id, step)
                 gr.decisions.append(d)
                 log(f"  [chunk {step}] {d.explain()}")

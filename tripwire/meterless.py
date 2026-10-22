@@ -77,6 +77,15 @@ def _find_routed(obj: Any) -> str | None:
     return None
 
 
+def split_reasoning(text: str) -> tuple[str, str]:
+    """Nemotron reasoning lanes may return '<reasoning></think><answer>' in content.
+    Only the answer after the last </think> is used by the app."""
+    if "</think>" in text:
+        head, _, tail = text.rpartition("</think>")
+        return tail.strip(), head.replace("<think>", "").strip()
+    return text, ""
+
+
 class MeterlessClient:
     def __init__(self, base_url: str | None = None, token: str | None = None,
                  model: str | None = None, timeout: float = 180.0) -> None:
@@ -134,9 +143,11 @@ class MeterlessClient:
                 text = "".join(p.get("text", "") for p in text if isinstance(p, dict))
         except (KeyError, IndexError, TypeError):
             raise MeterlessError(f"unexpected chat response: {json.dumps(data)[:300]}") from None
+        text, reasoning = split_reasoning(text)
         meta = data.get("meterless") if isinstance(data.get("meterless"), dict) else {}
         routed = (_find_routed(meta) or _find_routed(data)
                   or headers.get("meterless-model") or headers.get("x-meterless-model") or data.get("model", ""))
         keep = {k: v for k, v in headers.items() if k.lower().startswith(("meterless", "x-meterless"))}
         receipt = Receipt(model, str(routed), latency, data.get("usage") or {}, meta, keep)
+        receipt.meterless = {**meta, "reasoning_chars_stripped": len(reasoning)}
         return text, receipt, data
