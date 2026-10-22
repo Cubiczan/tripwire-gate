@@ -22,6 +22,7 @@ INTENT {"action": "...", "resource": "...", "data_class": "...", "amount": 0, "d
 Allowed actions: read_record, export_data, send_email, issue_refund, pay_vendor, change_permissions, delete_record, run_sql.
 data_class is one of public, internal, confidential, pii, regulated. amount is in USD.
 Propose at most 3 intents per chunk, one item at a time, in backlog order. Do not re-propose decided items.
+Never spend a chunk only planning: every chunk must contain at least one INTENT line until all items are handled.
 Answer directly and briefly; no long deliberation. The gate's decisions arrive in your carryover under GATE DECISIONS.
 If something is denied, do not retry it; propose a safer alternative or hand it to a human."""
 
@@ -71,6 +72,7 @@ class Gate:
             for it in intents:
                 key = (it.action, it.resource, it.amount, it.destination)
                 if key in seen:
+                    log(f"  [chunk {step}] DUPLICATE {it.action} {it.resource} (already decided, not re-evaluated)")
                     lines.append(f"- DUPLICATE {it.action} {it.resource} (already decided; not re-evaluated)")
                     continue
                 seen.add(key)
@@ -79,8 +81,11 @@ class Gate:
                 log(f"  [chunk {step}] {d.explain()}")
                 lines.append(f"- {d.verdict.upper()} {it.action} {it.resource} ({', '.join(d.matched) or 'default-deny'})")
             if not intents:
-                lines.append("- (no intents proposed this chunk)")
-            return "GATE DECISIONS:\n" + "\n".join(lines)
+                log(f"  [chunk {step}] no intents proposed")
+                lines.append("- (no intents proposed this chunk: propose the next undecided backlog item now)")
+            decided = "; ".join(f"{d.intent.action} {d.intent.resource} = {d.verdict.upper()}" for d in gr.decisions)
+            return ("GATE DECISIONS (this chunk):\n" + "\n".join(lines)
+                    + "\nALREADY DECIDED (never re-propose): " + (decided or "nothing yet"))
 
         def generator(prompt: str) -> dict[str, str]:
             # The backlog is constant framing (the spec's G term): it does not grow with chain length.
