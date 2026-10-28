@@ -1,0 +1,15 @@
+zetaris> SHOW DATASOURCES
+{"headers":["name","description","id"],"data":[["tripwire_pg","","806"]],"total":1,"timeUsed":82}
+
+zetaris> SHOW TABLES IN tripwire_pg
+{"headers":["table_identifier","catalog_name","catalog_type"],"data":[["TRIPWIRE_PG.tripwire_ledger","TRIPWIRE_PG","Data Source"],["TRIPWIRE_PG.tripwire_policy_rules","TRIPWIRE_PG","Data Source"]],"total":2,"timeUsed":37}
+
+zetaris> SELECT rule_id, action, effect FROM tripwire_pg.tripwire_policy_rules ORDER BY rule_id
+{"headers":["rule_id","action","effect"],"data":[["R01-read-ok","read_record","allow"],["R02-read-regulated","read_record","review"],["R03-export-internal","export_data","allow"],["R04-export-pii","export_data","deny"],["R05-email-internal","send_email","allow"],["R06-email-external","send_email","review"],["R07-refund-small","issue_refund","allow"],["R08-refund-large","issue_refund","review"],["R09-pay-cap","pay_vendor","review"],["R10-pay-hard-cap","pay_vendor","deny"],["R11-perm","change_permissions","deny"],["R12-delete","delete_record","review"],["R13-sql","run_sql","allow"]],"total":13,"timeUsed":189}
+
+zetaris> SELECT verdict, count(*) AS n FROM tripwire_pg.tripwire_ledger WHERE run_id='344ca703-1e4d-4a71-bbb8-389899b7e677' GROUP BY verdict ORDER BY verdict
+{"headers":["verdict","n"],"data":[["allow","3"],["deny","3"],["review","2"]],"total":3,"timeUsed":460}
+
+zetaris> SELECT chunk, verdict, action, resource, matched FROM tripwire_pg.tripwire_ledger WHERE run_id='344ca703-1e4d-4a71-bbb8-389899b7e677' ORDER BY ts
+{"headers":["chunk","verdict","action","resource","matched"],"data":[["1","allow","issue_refund","order:O-1001","R07-refund-small"],["1","review","issue_refund","order:O-2290","R08-refund-large"],["2","deny","export_data","dataset:q3_churned_customers","R04-export-pii"],["2","allow","send_email","status-summary","R05-email-internal"],["2","review","send_email","status-summary","R06-email-external"],["3","deny","pay_vendor","invoice:INV-77","R10-pay-hard-cap"],["3","deny","change_permissions","billing:admin-role","R11-perm"],["4","allow","export_data","dataset:q3_churn_counts_by_region","R03-export-internal"]],"total":8,"timeUsed":374}
+

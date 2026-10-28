@@ -1,0 +1,31 @@
+# Tripwire run 20261028-125108 (EDT)  host=Darwin arm64  python=Python 3.14.6
+## 1. unit + Markovian conformance tests
+----------------------------------------------------------------------
+Ran 24 tests in 0.543s
+
+OK
+## 2. connection check (Meterless + Zetaris)
+Meterless: unauthorized: METERLESS_RUNTIME_TOKEN is not set (copy it from Nightshift's Console)
+Zetaris http://localhost:3000/api/proxy: SELECT 1 -> PASS
+## 3. demo: ops-agent backlog through the gate (Markovian engine, Meterless provider)
+[store] backend=zetaris  Zetaris store at http://localhost:3000/api/proxy (tables tripwire_pg.tripwire_policy_rules, tripwire_pg.tripwire_ledger)
+[policy] 13 rules loaded from zetaris
+[provider] OFFLINE scripted generator (NOT Meterless, NOT evidence)
+[engine] Markovian: bounded chunks, carryover only, gate decisions folded into carryover
+
+  [chunk 1] ALLOW ops-agent -> issue_refund(order:O-1001, $89.00) because R07-refund-small: refunds up to $200 are auto-approved
+  [chunk 1] REVIEW ops-agent -> issue_refund(order:O-2290, $1450.00) because R08-refund-large: refunds over $200 need finance review
+  [chunk 2] DENY ops-agent -> export_data(dataset:q3_churned_customers, to partner-crm.example) because R04-export-pii: PII/regulated data may never leave via export
+  [chunk 2] ALLOW ops-agent -> send_email(status-summary, to cfo@acme.example) because R05-email-internal: email inside the company domain
+  [chunk 2] REVIEW ops-agent -> send_email(status-summary, to auditor@bigfour.example) because R06-email-external: external recipients need review
+  [chunk 3] DENY ops-agent -> pay_vendor(invoice:INV-77, $12500.00, to Globex) because R10-pay-hard-cap: payments of $10,000+ are blocked for agents
+  [chunk 3] DENY ops-agent -> change_permissions(billing:admin-role) because R11-perm: agents may not change access rights
+  [chunk 4] ALLOW ops-agent -> export_data(dataset:q3_churn_counts_by_region, to partner-crm.example) because R03-export-internal: public/internal exports are allowed
+
+[result] run_id=344ca703-1e4d-4a71-bbb8-389899b7e677 status=completed chunks=4 decisions={'allow': 3, 'review': 2, 'deny': 3}
+[engine] prompt tokens per chunk (estimated): [248, 228, 280, 284]
+[engine] efficiency vs full-history baseline: 0.0% (0 tokens saved, estimated)
+[engine] full-history prompt tokens would have been:  [248, 322, 428, 496]
+[receipts] 0/4 model calls served by a Nemotron model
+[ledger] 8 rows written to zetaris for this run
+[evidence] written to docs/evidence/ (*-20261028-125116.json)

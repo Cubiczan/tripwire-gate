@@ -1,0 +1,22 @@
+[
+  {
+    "requested_model": "offline-script",
+    "routed_model": "offline-script",
+    "is_nemotron": false
+  },
+  {
+    "requested_model": "offline-script",
+    "routed_model": "offline-script",
+    "is_nemotron": false
+  },
+  {
+    "requested_model": "offline-script",
+    "routed_model": "offline-script",
+    "is_nemotron": false
+  },
+  {
+    "requested_model": "offline-script",
+    "routed_model": "offline-script",
+    "is_nemotron": false
+  }
+]

@@ -122,3 +122,21 @@ run.sh                 one-command run with evidence capture
 ```
 
 License: MIT
+
+
+## Live run on self-hosted Zetaris (Oct 28, 2026)
+
+Tripwire ran against the Zetaris hackathon Docker kit on a MacBook (Apple Silicon). Policy rules are read, and every gate decision is written and read back, **through Zetaris's SQL API**. The `tripwire_pg` Postgres datasource is registered in Zetaris Lightning by `scripts/zetaris_local_setup.sh`. The agent's actions came from the offline scripted generator (`OFFLINE=1`), not a live LLM.
+
+![Tripwire run with backend=zetaris](docs/screenshots/01-run-zetaris-live.png)
+*`run.sh` on the Mac: Zetaris `SELECT 1` passes, 13 rules load from Zetaris, 8 decisions (3 allow, 2 review, 3 deny) and 8 ledger rows written to Zetaris.*
+
+![Zetaris datasource, tables and policy rules](docs/screenshots/02-zetaris-datasource-rules.png)
+*Zetaris SQL API: the registered `tripwire_pg` datasource, its two Tripwire tables, and the 13 policy rules.*
+
+![Ledger queried through Zetaris](docs/screenshots/03-zetaris-ledger.png)
+*The run's ledger, read back through Zetaris: verdict counts and every decision with the rule that matched.*
+
+Raw evidence: `docs/evidence/console-20261028-125108.txt`, `ledger-zetaris-20261028-125116.json`, `zetaris-queries-20261028-125116.txt`.
+
+Setup: `scripts/zetaris_local_setup.sh`, then set `ZETARIS_REST_URL=http://localhost:3000/api/proxy ZETARIS_ORG_ID=1 ZETARIS_DATASOURCE=tripwire_pg ZETARIS_API_KEY=...` and run `./run.sh`.
