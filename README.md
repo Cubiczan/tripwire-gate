@@ -140,3 +140,9 @@ Tripwire ran against the Zetaris hackathon Docker kit on a MacBook (Apple Silico
 Raw evidence: `docs/evidence/console-20261028-125108.txt`, `ledger-zetaris-20261028-125116.json`, `zetaris-queries-20261028-125116.txt`.
 
 Setup: `scripts/zetaris_local_setup.sh`, then set `ZETARIS_REST_URL=http://localhost:3000/api/proxy ZETARIS_ORG_ID=1 ZETARIS_DATASOURCE=tripwire_pg ZETARIS_API_KEY=...` and run `./run.sh`.
+
+## Demo video
+
+[![Tripwire x Zetaris demo](docs/video/thumbnail.png)](docs/video/CUBICZAN_281026.mp4)
+
+[Watch the demo video (2:37)](docs/video/CUBICZAN_281026.mp4)
