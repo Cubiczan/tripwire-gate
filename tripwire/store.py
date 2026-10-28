@@ -51,8 +51,14 @@ class ZetarisStore:
     backend = "zetaris"
 
     def __init__(self, rest_url: str, api_key: str, org_id: str = "1", schema: str = "tripwire",
-                 timeout: float = 60.0) -> None:
+                 timeout: float = 60.0, datasource: str | None = None) -> None:
         self.rest_url = rest_url.rstrip("/")
+        # Self-hosted Zetaris (hackathon Docker kit): Lightning cannot CREATE TABLE inside a
+        # JDBC datasource, so the two tables are created once in the source DB
+        # (scripts/zetaris_local_setup.sh) and then every read/write goes through Zetaris
+        # as <datasource>.<table>.
+        self.datasource = datasource
+        self.prefix = f"{datasource}." if datasource else ""
         self._key = api_key
         self.org_id = org_id
         self.schema = schema
@@ -70,7 +76,8 @@ class ZetarisStore:
         if not url or not key:
             return None
         return cls(url, key, os.environ.get("ZETARIS_ORG_ID", "1"),
-                   os.environ.get("ZETARIS_SCHEMA", "tripwire"))
+                   os.environ.get("ZETARIS_SCHEMA", "tripwire"),
+                   datasource=os.environ.get("ZETARIS_DATASOURCE") or None)
 
     def sql(self, statement: str, limit: int = 1000) -> dict[str, Any]:
         body = json.dumps({"queryId": str(uuid.uuid4()), "sql": statement,
@@ -81,11 +88,14 @@ class ZetarisStore:
                      "X-Request-ID": str(uuid.uuid4()), "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                return json.loads(r.read().decode() or "{}")
+                resp = json.loads(r.read().decode() or "{}")
         except urllib.error.HTTPError as e:
             raise ZetarisError(f"Zetaris HTTP {e.code}: {e.read().decode(errors='replace')[:300]}") from None
         except urllib.error.URLError as e:
             raise ZetarisError(f"Zetaris unreachable at {self.rest_url}: {e.reason}") from None
+        if isinstance(resp, dict) and "msg" in resp and "data" not in resp:
+            raise ZetarisError(f"Zetaris SQL error: {str(resp['msg'])[:300]}")
+        return resp
 
     @staticmethod
     def _rows(resp: dict[str, Any], cols: list[str]) -> list[dict[str, Any]]:
@@ -107,8 +117,15 @@ class ZetarisStore:
         data = resp.get("data")
         return bool(data) and str((data[0][0] if isinstance(data[0], list) else list(data[0].values())[0])) == "1"
 
+    def t(self, name: str) -> str:
+        return f"{self.prefix}{self.schema}_{name}"
+
     def init(self) -> None:
         s = self.schema
+        if self.datasource:
+            self.sql(f"REGISTER DATASOURCE TABLES FROM {self.datasource}")
+            self._seed()
+            return
         stmts = [
             f"CREATE TABLE IF NOT EXISTS {s}_policy_rules (rule_id STRING, action STRING, effect STRING, reason STRING, "
             f"data_classes STRING, min_amount DOUBLE, max_amount DOUBLE, dest_not_suffix STRING, agents STRING)",
@@ -118,22 +135,26 @@ class ZetarisStore:
         ]
         for st in stmts:
             self.sql(st)
+        self._seed()
+
+    def _seed(self) -> None:
+        s = self.schema
         if not self.load_rules():
             for r in SEED_RULES:
                 vals = ", ".join(_q(r.get(c)) for c in RULE_COLS)
-                self.sql(f"INSERT INTO {s}_policy_rules VALUES ({vals})")
+                self.sql(f"INSERT INTO {self.t('policy_rules')} VALUES ({vals})")
 
     def load_rules(self) -> list[Rule]:
-        resp = self.sql(f"SELECT {', '.join(RULE_COLS)} FROM {self.schema}_policy_rules")
+        resp = self.sql(f"SELECT {', '.join(RULE_COLS)} FROM {self.t('policy_rules')}")
         return [Rule.from_row(r) for r in self._rows(resp, RULE_COLS)]
 
     def append(self, row: dict[str, Any]) -> None:
         vals = ", ".join(_q(row.get(c)) if c != "chunk" else str(int(row.get(c, 0))) for c in LEDGER_COLS)
-        self.sql(f"INSERT INTO {self.schema}_ledger VALUES ({vals})")
+        self.sql(f"INSERT INTO {self.t('ledger')} VALUES ({vals})")
 
     def ledger(self, run_id: str | None = None) -> list[dict[str, Any]]:
         where = f" WHERE run_id = {_q(run_id)}" if run_id else ""
-        resp = self.sql(f"SELECT {', '.join(LEDGER_COLS)} FROM {self.schema}_ledger{where} ORDER BY ts")
+        resp = self.sql(f"SELECT {', '.join(LEDGER_COLS)} FROM {self.t('ledger')}{where} ORDER BY ts")
         return self._rows(resp, LEDGER_COLS)
 
 
@@ -178,7 +199,7 @@ def open_store(log=print) -> tuple[Store, str]:
     else:
         try:
             z.init()
-            return z, f"Zetaris store at {z.rest_url} (tables {z.schema}_policy_rules, {z.schema}_ledger)"
+            return z, f"Zetaris store at {z.rest_url} (tables {z.t('policy_rules')}, {z.t('ledger')})"
         except ZetarisError as e:
             note = f"Zetaris configured but failed ({e}) -> using SQLite FALLBACK"
     s = SqliteFallbackStore(os.environ.get("TRIPWIRE_FALLBACK_DB", "tripwire_fallback.db"))
